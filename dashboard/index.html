@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FinGraph: Fraud Syndicate Radar</title>
+<style>
+:root{--bg:#eef1f6;--panel:#fff;--text:#12161d;--mut:#667085;--line:#cfd6e2;--accent:#2563eb;--danger:#e11d48;--node:#8a96a8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#070a12;--panel:#10151f;--text:#e8edf5;--mut:#8b97aa;--line:#26314a;--accent:#38bdf8;--danger:#fb3b64;--node:#4a5a78}}
+:root[data-theme="dark"]{--bg:#070a12;--panel:#10151f;--text:#e8edf5;--mut:#8b97aa;--line:#26314a;--accent:#38bdf8;--danger:#fb3b64;--node:#4a5a78}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(900px 500px at 15% -10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent),radial-gradient(700px 500px at 100% 110%,color-mix(in srgb,var(--danger) 12%,transparent),transparent),var(--bg)}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel) 70%,transparent);backdrop-filter:blur(10px)}
+h1{font-size:19px;margin:0;letter-spacing:.02em;background:linear-gradient(90deg,var(--accent),var(--danger));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:16px 0 8px}
+.badge{font-size:12px;padding:3px 11px;border-radius:99px;border:1px solid var(--line);color:var(--mut);display:flex;align-items:center;gap:7px}
+.badge i{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #22c55e99}100%{box-shadow:0 0 0 9px #22c55e00}}
+.stats{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}.stats b{display:block;font-size:19px;font-variant-numeric:tabular-nums}.stats span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+#rp{margin:0;border-color:var(--accent);color:var(--accent);padding:7px 14px;font-weight:600}#rp:hover{background:var(--accent);color:var(--bg)}
+main{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 66px)}
+#stage{position:relative;min-height:340px}canvas{width:100%;height:100%;display:block;cursor:grab}
+#hint{position:absolute;left:14px;bottom:10px;font-size:12px;color:var(--mut)}
+aside{border-left:1px solid var(--line);padding:2px 14px 16px;overflow:auto;background:color-mix(in srgb,var(--panel) 75%,transparent);backdrop-filter:blur(10px)}
+.g{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:12px;padding:10px 11px;margin-bottom:9px;cursor:pointer;background:var(--panel);transition:transform .2s,box-shadow .2s;animation:in .5s both}
+.g:hover,.g.on{transform:translateX(-3px);box-shadow:0 6px 24px color-mix(in srgb,var(--c) 30%,transparent)}
+@keyframes in{from{opacity:0;transform:translateY(10px)}}
+.g .t{display:flex;justify-content:space-between;font-weight:700}.g small{color:var(--mut)}
+.bar{height:5px;border-radius:9px;background:var(--line);margin:7px 0 4px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,var(--danger));transition:width 1s}
+button{font:inherit;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer;transition:.2s}
+button:hover{background:var(--danger);color:#fff}button.undo{border-color:var(--mut);color:var(--mut)}
+#detail{font-size:13px;color:var(--mut);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}#detail b{color:var(--text)}
+.toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 76px);right:16px;z-index:9;max-width:320px;padding:12px 16px;border-radius:12px;background:var(--danger);color:#fff;font-weight:600;box-shadow:0 10px 40px #0006;animation:slide .5s both}
+.toast.out{animation:out .6s both}@keyframes slide{from{transform:translateX(120%)}}@keyframes out{to{transform:translateX(120%);opacity:0}}
+@media(max-width:760px){main{grid-template-columns:1fr;height:auto}#stage{height:58vh}aside{border-left:0;border-top:1px solid var(--line)}.stats{margin-left:0}}
+</style></head><body>
+<header><h1>FinGraph · Fraud Syndicate Radar</h1><span class="badge"><i></i><span id="mode">loading…</span></span><button id="rp">▶ Replay attack</button>
+<div class="stats"><div><b id="s1">0</b><span>accounts</span></div><div><b id="s2">0</b><span>transfers</span></div><div><b id="s3">0</b><span>flagged groups</span></div><div><b id="s4">0</b><span>frozen</span></div></div></header>
+<main><section id="stage"><canvas id="cv"></canvas><div id="hint">Scroll to zoom · drag to pan · click a node. Size = PageRank, moving dots = money flow.</div></section>
+<aside><h2>Flagged groups</h2><div id="groups"></div><h2>Selected account</h2><div id="detail">Click a node to inspect it.</div></aside></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),f=n=>"ACC"+String(n).padStart(6,"0"),PAL=["#fb3b64","#f59e0b","#a78bfa","#22d3ee","#34d399"];
+let nodes=[],links=[],groups=[],sel=null,hov=null,focus=null,live=false,T=d3.zoomIdentity,W=0,H=0,sim,C={},shown={};
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function demo(){const r=rng(7),L=[];
+ for(let i=0;i<260;i++){const a=Math.floor(r()*90),b=Math.floor(r()*90);if(a!==b)L.push([f(a),f(b),Math.min(Math.exp(5+r()*3.8),8000)])}
+ const shell=f(900001);for(let i=0;i<50;i++)L.push([f(800000+i),shell,9500+r()*400]);
+ let amt=470000;L.push([shell,f(700000),amt]);for(let i=0;i<5;i++)L.push([f(700000+i),f(700001+i),amt*=.97]);
+ for(let i=0;i<3;i++)L.push([f(600000+i),f(600000+(i+1)%3),12000*(.97+r()*.03)]);
+ const ids=new Set(L.flatMap(x=>[x[0],x[1]]));
+ return{nodes:[...ids].map(id=>({id})),links:L.map(x=>({source:x[0],target:x[1],total:x[2]}))}}
+function analyse(){const by=new Map(nodes.map(n=>[n.id,n])),p={};nodes.forEach(n=>p[n.id]=n.id);
+ const find=x=>p[x]===x?x:(p[x]=find(p[x]));links.forEach(l=>{p[find(l.source)]=find(l.target)});nodes.forEach(n=>n.comp=find(n.id));
+ const N=nodes.length,out={};let pr={};nodes.forEach(n=>{pr[n.id]=1/N;out[n.id]=0});links.forEach(l=>out[l.source]+=l.total);
+ for(let k=0;k<30;k++){const nx={};nodes.forEach(n=>nx[n.id]=.15/N);let d=0;nodes.forEach(n=>{if(!out[n.id])d+=pr[n.id]});
+  links.forEach(l=>nx[l.target]+=.85*pr[l.source]*l.total/out[l.source]);nodes.forEach(n=>nx[n.id]+=.85*d/N);pr=nx}
+ const sin={},adj={},cyc=new Set();
+ links.forEach(l=>{if(l.total>=9000&&l.total<10000)(sin[l.target]=sin[l.target]||new Set()).add(l.source);(adj[l.source]=adj[l.source]||[]).push(l)});
+ links.forEach(a=>(adj[a.target]||[]).forEach(b=>(adj[b.target]||[]).forEach(c=>{if(c.target===a.source&&a.total>=5000&&Math.abs(a.total-b.total)/a.total<.05&&Math.abs(b.total-c.total)/b.total<.05)[a.source,a.target,b.target].forEach(x=>cyc.add(x))})));
+ nodes.forEach(n=>{const k=sin[n.id]?sin[n.id].size:0;n.pr??=pr[n.id];n.risk??=Math.max(Math.min(1,k/50),cyc.has(n.id)?.5:0);n.kind=k>=20?"Starburst":cyc.has(n.id)?"Circular flow":""});
+ const g={},vol={};nodes.forEach(n=>(g[n.comp]=g[n.comp]||[]).push(n));links.forEach(l=>{const c=by.get(l.source).comp;vol[c]=(vol[c]||0)+l.total});
+ groups=Object.entries(g).map(([c,m])=>({c,m,vol:vol[c]||0,risk:Math.max(...m.map(n=>n.risk)),kind:(m.find(n=>n.kind==="Starburst")||m.find(n=>n.kind)||{}).kind||"Flagged"}))
+  .filter(x=>x.m.length>=3&&x.risk>=.5).sort((a,b)=>b.risk-a.risk||b.m.length-a.m.length);
+ groups.forEach((x,i)=>x.m.forEach(n=>n.col=PAL[i%PAL.length]));
+ const mx=Math.max(...nodes.map(n=>n.pr));nodes.forEach(n=>n.r=3+14*Math.sqrt(n.pr/mx))}
+const money=v=>"$"+Math.round(v).toLocaleString("en-US"),frozenIn=g=>g.m.every(n=>n.frozen);
+function count(id,to){const el=$(id),from=shown[id]||0,t0=performance.now();shown[id]=to;(function s(now){const u=Math.min(1,(now-t0)/700);el.textContent=Math.round(from+(to-from)*(1-Math.pow(1-u,3)));if(u<1)requestAnimationFrame(s)})(t0)}
+function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.classList.add("out"),5200);setTimeout(()=>t.remove(),6000)}
+function ui(){count("#s1",nodes.length);count("#s2",links.length);count("#s3",groups.length);count("#s4",nodes.filter(n=>n.frozen).length);
+ $("#groups").innerHTML=groups.map((g,i)=>`<div class="g ${focus===g?"on":""}" style="--c:${g.m[0].col};animation-delay:${i*80}ms" data-i="${i}"><div class="t"><span>${g.kind}</span><span>${g.risk.toFixed(2)}</span></div><div class="bar"><i style="width:${g.risk*100}%"></i></div><small>${g.m.length} accounts · ${money(g.vol)} moved</small><br><button data-f="${i}" class="${frozenIn(g)?"undo":""}" style="margin-top:7px">${frozenIn(g)?"Frozen · undo":"Freeze group"}</button></div>`).join("")||"<small>No flagged groups.</small>";
+ const n=sel;$("#detail").innerHTML=n?`<b>${n.id}</b><br>Risk score: <b>${n.risk.toFixed(2)}</b>${n.kind?" ("+n.kind+")":""}<br>PageRank: ${n.pr.toExponential(2)}<br>Group size: ${nodes.filter(x=>x.comp===n.comp).length}<br>Status: ${n.frozen?"FROZEN":"active"}`:"Click a node to inspect it."}
+async function freeze(g){const on=!frozenIn(g),now=performance.now();g.m.forEach(n=>{n.frozen=on;if(on)n.fz=now});
+ if(live)try{await fetch("/api/freeze",{method:"POST",body:JSON.stringify({ids:g.m.map(n=>n.id),status:on?"FROZEN":null})})}catch(e){}ui()}
+function replay(){if(!groups.length)return toast("No flagged groups to replay.");const now=performance.now(),fn=groups.flatMap(g=>g.m),fl=links.filter(l=>l.source.col).sort(()=>Math.random()-.5);
+ fn.forEach(n=>{n.det=false;n.born=1e15;n.frozen=false});fl.forEach((l,i)=>{l.born=now+400+i*(9000/fl.length);l.source.born=Math.min(l.source.born,l.born);l.target.born=Math.min(l.target.born,l.born)});ui();
+ setTimeout(()=>{fn.forEach(n=>{n.det=true;n.hit=performance.now()});const g=groups[0];toast("🚨 "+g.kind+" detected: "+g.m.length+" accounts · risk "+g.risk.toFixed(2))},9600)}
+const cv=$("#cv"),ctx=cv.getContext("2d");
+function colors(){const s=getComputedStyle(document.documentElement);["--line","--node","--accent","--danger","--text"].forEach(k=>C[k]=s.getPropertyValue(k).trim())}
+function draw(now){const dpr=devicePixelRatio||1,c=ctx,A=v=>Math.min(1,Math.max(0,v));c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);c.translate(T.x,T.y);c.scale(T.k,T.k);
+ const act=sel||hov,k=1/Math.sqrt(T.k);c.lineWidth=.7/T.k;
+ links.forEach((l,i)=>{const a=A((now-(l.born||0))/600);if(a<=0)return;const col=l.source.det===false?null:l.source.col,hot=act&&(l.source===act||l.target===act);
+  c.globalAlpha=a*(col||hot?.6:.22);c.strokeStyle=col||(hot?C["--accent"]:C["--line"]);c.beginPath();c.moveTo(l.source.x,l.source.y);c.lineTo(l.target.x,l.target.y);c.stroke();
+  if(col||i%4===0){const u=(now*(col?.00028:.00012)+i*.37)%1;c.globalAlpha=a*(col?.95:.5);c.fillStyle=col||C["--accent"];c.beginPath();c.arc(l.source.x+(l.target.x-l.source.x)*u,l.source.y+(l.target.y-l.source.y)*u,(col?2.4:1.5)*k,0,7);c.fill()}});
+ nodes.forEach(n=>{const na=A((now-(n.born||0))/500);if(na<=0)return;const col=n.det===false?null:n.col,dim=focus&&!focus.m.includes(n)?.15:1,p=.5+.5*Math.sin(now/350+n.r);
+  if(col&&!n.frozen&&n.risk>=.5){c.globalAlpha=na*(.1+.16*p);c.fillStyle=col;c.beginPath();c.arc(n.x,n.y,n.r+6+6*p,0,7);c.fill()}
+  c.globalAlpha=na*dim;c.fillStyle=col||C["--node"];c.beginPath();c.arc(n.x,n.y,n.r*(n.hit&&now-n.hit<500?1+.6*Math.sin((now-n.hit)/500*Math.PI):1),0,7);c.fill();
+  if(n.frozen||n===sel){c.lineWidth=2/T.k;c.strokeStyle=n.frozen?C["--danger"]:C["--text"];c.stroke();c.lineWidth=.7/T.k}
+  [[n.fz,C["--danger"],900],[n.hit,col,1100]].forEach(([t0,cl,d])=>{if(t0&&now-t0<d){const u=(now-t0)/d;c.globalAlpha=(1-u)*.8;c.strokeStyle=cl;c.lineWidth=2/T.k;c.beginPath();c.arc(n.x,n.y,n.r+u*50,0,7);c.stroke();c.lineWidth=.7/T.k}})});
+ if(act){c.globalAlpha=1;c.fillStyle=C["--text"];c.font=12*k+"px system-ui";c.fillText(act.id,act.x+act.r+4,act.y-act.r)}c.globalAlpha=1}
+(function loop(t){draw(t);requestAnimationFrame(loop)})(0);
+function size(){const b=$("#stage").getBoundingClientRect(),d=devicePixelRatio||1;W=b.width;H=b.height;cv.width=W*d;cv.height=H*d;if(sim)sim.force("center",d3.forceCenter(W/2,H/2));colors()}
+function start(data,isLive){live=isLive;nodes=data.nodes;links=data.links;analyse();
+ $("#mode").textContent=live?"LIVE · Neo4j":"DEMO · simulated data";
+ sim=d3.forceSimulation(nodes).alphaTarget(.012).force("link",d3.forceLink(links).id(d=>d.id).distance(28).strength(.5)).force("charge",d3.forceManyBody().strength(-38)).force("collide",d3.forceCollide(d=>d.r+1));
+ nodes.forEach(n=>{if(n.status==="FROZEN")n.frozen=true});size();ui();
+ setTimeout(()=>{if(groups.length)toast("🚨 "+groups.length+" flagged groups · top: "+groups[0].kind+" (risk "+groups[0].risk.toFixed(2)+")")},1600)}
+d3.select(cv).call(d3.zoom().scaleExtent([.2,8]).on("zoom",e=>{T=e.transform}));
+cv.addEventListener("click",e=>{const[x,y]=T.invert([e.offsetX,e.offsetY]);sel=sim.find(x,y,14/T.k)||null;ui()});
+cv.addEventListener("mousemove",e=>{const[x,y]=T.invert([e.offsetX,e.offsetY]);hov=sim.find(x,y,12/T.k)||null;cv.style.cursor=hov?"pointer":"grab"});
+$("#groups").addEventListener("click",e=>{const fb=e.target.dataset.f;if(fb!==undefined){freeze(groups[fb]);return}
+ const g=e.target.closest(".g");if(g){const x=groups[g.dataset.i];focus=focus===x?null:x;ui()}});
+$("#rp").onclick=replay;addEventListener("resize",size);matchMedia("(prefers-color-scheme:dark)").addEventListener("change",colors);
+(async()=>{try{const r=await fetch("/api/graph"),d=await r.json();if(d.nodes&&d.nodes.length)return start(d,true)}catch(e){}start(demo(),false)})();
+</script></body></html>

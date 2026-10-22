@@ -35,12 +35,13 @@ SET s.risk_score = least(1.0, senders / 50.0),
     s.risk_updated = datetime()
 RETURN count(s) AS accounts_scored;
 
-// 5. RISK SCORE v1 (cycle flag)
+// 5. RISK SCORE v1 (cycle flag) - safe to re-run
 MATCH (a:Account)-[t1:TRANSFERRED_TO]->(b:Account)-[t2:TRANSFERRED_TO]->(c:Account)-[t3:TRANSFERRED_TO]->(a)
 WHERE t1.ts > datetime() - duration('PT1H') AND t1.amount >= 5000
   AND abs(t1.amount - t2.amount) / t1.amount < 0.05
   AND abs(t2.amount - t3.amount) / t2.amount < 0.05
-WITH collect(DISTINCT a) + collect(DISTINCT b) + collect(DISTINCT c) AS ring_accts
-UNWIND ring_accts AS x
+WITH collect(DISTINCT a) + collect(DISTINCT b) + collect(DISTINCT c) AS ring
+UNWIND ring AS x
 WITH DISTINCT x
-SET x.risk_score = coalesce(x.risk_score, 0) + 0.5, x.risk_reason = 'circular flow';
+SET x.risk_score = greatest(coalesce(x.risk_score, 0), 0.5),
+    x.risk_reason = coalesce(x.risk_reason, 'circular flow');
