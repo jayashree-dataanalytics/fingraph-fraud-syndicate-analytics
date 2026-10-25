@@ -1,0 +1,3 @@
+﻿starburst          p50=  18.6 ms  p95=  30.0 ms  PASS
+cycle_3hop         p50=  19.8 ms  p95=  22.3 ms  PASS
+multihop_trace_4   p50=  15.6 ms  p95=  20.5 ms  PASS

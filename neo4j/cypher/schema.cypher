@@ -16,3 +16,6 @@ CREATE INDEX acct_risk IF NOT EXISTS FOR (a:Account) ON (a.risk_score);
 
 // Week 2 addition: needed for the latency proof
 CREATE INDEX tx_write_ts IF NOT EXISTS FOR ()-[t:TRANSFERRED_TO]-() ON (t.write_ts);
+
+// Week 4: speeds up the starburst query (selective amount range)
+CREATE INDEX tx_amount IF NOT EXISTS FOR ()-[t:TRANSFERRED_TO]-() ON (t.amount);
