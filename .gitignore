@@ -2,3 +2,4 @@ labels.jsonl
 __pycache__/
 *.pyc
 *.jar
+alerts/.alert_state.json
