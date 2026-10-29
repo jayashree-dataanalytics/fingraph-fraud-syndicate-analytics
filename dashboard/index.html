@@ -24,6 +24,8 @@ aside{border-left:1px solid var(--line);padding:2px 14px 16px;overflow:auto;back
 .g:hover,.g.on{transform:translateX(-3px);box-shadow:0 6px 24px color-mix(in srgb,var(--c) 30%,transparent)}
 @keyframes in{from{opacity:0;transform:translateY(10px)}}
 .g .t{display:flex;justify-content:space-between;font-weight:700}.g small{color:var(--mut)}
+.tog{background:none;border:0;color:var(--mut);padding:0;margin-top:6px}.tog:hover{background:none;color:var(--text)}
+.mem{margin-top:7px;max-height:160px;overflow:auto;border-top:1px solid var(--line)}.mem div{display:flex;justify-content:space-between;padding:3px 2px;font-size:12px;cursor:pointer}.mem div:hover{color:var(--accent)}
 .bar{height:5px;border-radius:9px;background:var(--line);margin:7px 0 4px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,var(--danger));transition:width 1s}
 button{font:inherit;font-size:12px;padding:5px 11px;border-radius:9px;border:1px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer;transition:.2s}
 button:hover{background:var(--danger);color:#fff}button.undo{border-color:var(--mut);color:var(--mut)}
@@ -39,7 +41,7 @@ button:hover{background:var(--danger);color:#fff}button.undo{border-color:var(--
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script>
 const $=s=>document.querySelector(s),f=n=>"ACC"+String(n).padStart(6,"0"),PAL=["#fb3b64","#f59e0b","#a78bfa","#22d3ee","#34d399"];
-let nodes=[],links=[],groups=[],sel=null,hov=null,focus=null,live=false,T=d3.zoomIdentity,W=0,H=0,sim,C={},shown={};
+let nodes=[],links=[],groups=[],sel=null,hov=null,focus=null,live=false,T=d3.zoomIdentity,W=0,H=0,sim,C={},shown={},open=new Set();
 function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function demo(){const r=rng(7),L=[];
  for(let i=0;i<260;i++){const a=Math.floor(r()*90),b=Math.floor(r()*90);if(a!==b)L.push([f(a),f(b),Math.min(Math.exp(5+r()*3.8),8000)])}
@@ -66,7 +68,7 @@ const money=v=>"$"+Math.round(v).toLocaleString("en-US"),frozenIn=g=>g.m.every(n
 function count(id,to){const el=$(id),from=shown[id]||0,t0=performance.now();shown[id]=to;(function s(now){const u=Math.min(1,(now-t0)/700);el.textContent=Math.round(from+(to-from)*(1-Math.pow(1-u,3)));if(u<1)requestAnimationFrame(s)})(t0)}
 function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.classList.add("out"),5200);setTimeout(()=>t.remove(),6000)}
 function ui(){count("#s1",nodes.length);count("#s2",links.length);count("#s3",groups.length);count("#s4",nodes.filter(n=>n.frozen).length);
- $("#groups").innerHTML=groups.map((g,i)=>`<div class="g ${focus===g?"on":""}" style="--c:${g.m[0].col};animation-delay:${i*80}ms" data-i="${i}"><div class="t"><span>${g.kind}</span><span>${g.risk.toFixed(2)}</span></div><div class="bar"><i style="width:${g.risk*100}%"></i></div><small>${g.m.length} accounts · ${money(g.vol)} moved</small><br><button data-f="${i}" class="${frozenIn(g)?"undo":""}" style="margin-top:7px">${frozenIn(g)?"Frozen · undo":"Freeze group"}</button></div>`).join("")||"<small>No flagged groups.</small>";
+ $("#groups").innerHTML=groups.map((g,i)=>`<div class="g ${focus===g?"on":""}" style="--c:${g.m[0].col};animation-delay:${i*80}ms" data-i="${i}"><div class="t"><span>${g.kind}</span><span>${g.risk.toFixed(2)}</span></div><div class="bar"><i style="width:${g.risk*100}%"></i></div><small>${g.m.length} accounts · ${money(g.vol)} moved</small><br><button class="tog" data-x="${i}">${open.has(g.c)?"\u25BE Hide accounts":"\u25B8 Show accounts"}</button>${open.has(g.c)?`<div class="mem">${g.m.slice().sort((a,b)=>b.risk-a.risk).map(n=>`<div data-n="${n.id}"><span>${n.id}</span><span>${n.risk.toFixed(2)}</span></div>`).join("")}</div>`:""}<br><button data-f="${i}" class="${frozenIn(g)?"undo":""}" style="margin-top:7px">${frozenIn(g)?"Frozen · undo":"Freeze group"}</button></div>`).join("")||"<small>No flagged groups.</small>";
  const n=sel;$("#detail").innerHTML=n?`<b>${n.id}</b><br>Risk score: <b>${n.risk.toFixed(2)}</b>${n.kind?" ("+n.kind+")":""}<br>PageRank: ${n.pr.toExponential(2)}<br>Group size: ${nodes.filter(x=>x.comp===n.comp).length}<br>Status: ${n.frozen?"FROZEN":"active"}`:"Click a node to inspect it."}
 async function freeze(g){const on=!frozenIn(g),now=performance.now();g.m.forEach(n=>{n.frozen=on;if(on)n.fz=now});
  if(live)try{await fetch("/api/freeze",{method:"POST",body:JSON.stringify({ids:g.m.map(n=>n.id),status:on?"FROZEN":null})})}catch(e){}ui()}
@@ -96,7 +98,7 @@ function start(data,isLive){live=isLive;nodes=data.nodes;links=data.links;analys
 d3.select(cv).call(d3.zoom().scaleExtent([.2,8]).on("zoom",e=>{T=e.transform}));
 cv.addEventListener("click",e=>{const[x,y]=T.invert([e.offsetX,e.offsetY]);sel=sim.find(x,y,14/T.k)||null;ui()});
 cv.addEventListener("mousemove",e=>{const[x,y]=T.invert([e.offsetX,e.offsetY]);hov=sim.find(x,y,12/T.k)||null;cv.style.cursor=hov?"pointer":"grab"});
-$("#groups").addEventListener("click",e=>{const fb=e.target.dataset.f;if(fb!==undefined){freeze(groups[fb]);return}
+$("#groups").addEventListener("click",e=>{const t=e.target,xi=t.dataset.x;if(xi!==undefined){const c=groups[xi].c;open.has(c)?open.delete(c):open.add(c);ui();return}const row=t.closest("[data-n]");if(row){sel=nodes.find(n=>n.id===row.dataset.n)||null;ui();return}const fb=e.target.dataset.f;if(fb!==undefined){freeze(groups[fb]);return}
  const g=e.target.closest(".g");if(g){const x=groups[g.dataset.i];focus=focus===x?null:x;ui()}});
 $("#rp").onclick=replay;addEventListener("resize",size);matchMedia("(prefers-color-scheme:dark)").addEventListener("change",colors);
 (async()=>{try{const r=await fetch("/api/graph"),d=await r.json();if(d.nodes&&d.nodes.length)return start(d,true)}catch(e){}start(demo(),false)})();
