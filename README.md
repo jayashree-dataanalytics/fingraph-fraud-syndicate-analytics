@@ -67,3 +67,30 @@ and circular flows.
 - On Windows, the Flink job runs inside Docker (native PyFlink was unstable).
 - Neo4j login for local development: neo4j / fingraph123.
 - All data is simulated; no real customer data is used.
+
+## Alert rules engine
+
+`alerts/rules_engine.py` turns risk scores in the graph into alerts. It reads accounts and communities from Neo4j, checks them against a list of rules, and sends an alert for each match.
+
+### Rule types
+
+- **account**: alerts on any account whose risk score is at or above `threshold`.
+- **group**: alerts on any community whose score is at or above `threshold` and which has at least `min_members` accounts.
+
+Each rule has a `name`, a `type`, a `threshold` and a `cooldown_minutes`. Group rules also take `min_members`.
+
+### Cooldown
+
+After an alert fires, the same account or group is not alerted again until its `cooldown_minutes` has passed. Each account and group has its own cooldown. Cooldown state is stored in `.alert_state.json`, which is git-ignored.
+
+### Dry run
+
+`run_once(..., dry_run=True)` evaluates the rules without sending anything, so thresholds can be checked safely.
+
+### Tests
+
+The unit tests use fake Neo4j sessions, so no database is needed:
+
+    python alerts/test_rules.py -v
+
+They cover the threshold boundary, cooldown blocking, re-alerting after cooldown, group alerts with member counts, and per-account cooldowns.
