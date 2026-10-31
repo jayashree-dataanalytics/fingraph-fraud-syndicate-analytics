@@ -53,7 +53,12 @@ def main():
     args = p.parse_args()
     random.seed(args.seed)
 
-    producer = Producer({"bootstrap.servers": args.bootstrap, "linger.ms": 5})
+    producer = Producer({"bootstrap.servers": args.bootstrap, "linger.ms": 5, "message.timeout.ms": 8000})
+    stats = {"ok": 0, "fail": 0}
+
+    def on_delivery(err, _msg):
+        stats["fail" if err else "ok"] += 1
+
     syn_id, sent, start = 0, 0, time.time()
     next_syn = start
 
@@ -72,13 +77,16 @@ def main():
                 msg = {"tx_id": tx_id, "src": src, "dst": dst, "amount": round(amount, 2),
                        "currency": "USD", "ts": now.isoformat(),
                        "sim_ts": int(now.timestamp() * 1000)}  # used for latency proof in Week 2
-                producer.produce(TOPIC, key=src, value=json.dumps(msg))
+                producer.produce(TOPIC, key=src, value=json.dumps(msg), callback=on_delivery)
                 lf.write(json.dumps({"tx_id": tx_id, "pattern": pattern, "syndicate_id": sid}) + "\n")
                 sent += 1
                 time.sleep(interval)
             producer.poll(0)
-    producer.flush()
+    producer.flush(20)
     print(f"Sent {sent} events, {syn_id} syndicates. Labels in {args.labels}")
+    print(f"Delivered to Kafka: {stats['ok']}, failed: {stats['fail']}")
+    if stats["ok"] == 0:
+        print("WARNING: nothing reached Kafka. Is Docker Desktop running and fingraph-kafka Up?")
 
 
 if __name__ == "__main__":
