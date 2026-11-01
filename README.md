@@ -10,10 +10,18 @@ and circular flows.
     simulator/     transaction simulator with ground-truth labels
     flink_jobs/    PyFlink stream processor + Dockerfile
     neo4j/cypher/  schema.cypher, queries.cypher, gds.cypher
-    benchmarks/    latency.py (< 1 s proof), query_timing.py (< 100 ms proof)
+    benchmarks/    latency.py (< 1 s proof), query_timing.py (< 100 ms proof), evaluate.py (precision / recall)
     analytics/     run_gds.py (WCC, Louvain, PageRank)
+    alerts/        alert rules engine (threshold, cooldown, Slack / email)
     dashboard/     index.html (animated graph UI) + server.py (Neo4j API)
     docs/          screenshots and benchmark results
+
+## Results
+| Metric | Target | Result |
+|---|---|---|
+| Simulator → Neo4j latency (p99) | < 1000 ms | TBD |
+| Multi-hop query time (p95) | < 100 ms | TBD |
+| Detection precision / recall (vs labels.jsonl) | measured | TBD |
 
 ## Week 1: ingestion setup and graph schema   [Done]
 - Docker Compose environment: Kafka (KRaft) and Neo4j 5 with the GDS plugin.
@@ -21,7 +29,8 @@ and circular flows.
   constraints and indexes on tx_id and timestamps.
 - Python simulator: benign background traffic plus labeled fraud patterns
   (starburst, layering with fee skim, circular flow), streamed to the Kafka topic
-  transactions.raw. A separate labels.jsonl holds the ground truth.
+  transactions.raw. A separate labels.jsonl holds the ground truth. The simulator reports how
+  many messages Kafka actually received.
 
     docker compose -f docker/docker-compose.yml up -d kafka neo4j
     docker exec fingraph-kafka /opt/kafka/bin/kafka-topics.sh --create --topic transactions.raw --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
@@ -43,12 +52,7 @@ and circular flows.
     python benchmarks/latency.py 5                # < 1 s proof
     python benchmarks/query_timing.py             # < 100 ms proof
 
-| Metric | Target | Result |
-|---|---|---|
-| Simulator → Neo4j latency (p99) | < 1000 ms | fill in |
-| Multi-hop query time (p95) | < 100 ms | fill in |
-
-## Week 3: graph data science and dashboard   [In progress]
+## Week 3: graph data science and dashboard   [Implemented]
 - Neo4j GDS: Weakly Connected Components (isolates syndicates), Louvain communities,
   weighted PageRank (centrality of shell accounts).
 - Animated dashboard: moving money-flow particles, pulsing high-risk accounts, node size by
@@ -58,15 +62,23 @@ and circular flows.
     python analytics/run_gds.py                   # add --every 30 to refresh continuously
     python dashboard/server.py                    # open http://localhost:8000
 
-## Week 4: alerts, automation and polish   [Planned]
-- Rules engine: Slack / email alert when an account or group risk score passes a threshold.
-- Dashboard polish: expand / collapse nodes, trace the money trail visually, final layout.
-- Final evaluation: precision / recall of detections against labels.jsonl.
+## Week 4: alerts, automation and polish   [Implemented]
+- Alert rules engine: alerts when an account or group risk score passes a threshold, with a
+  per-account and per-group cooldown, to Slack and / or email (details below).
+- Dashboard: money-trail view (click an account, "Trace money trail": upstream and downstream
+  accounts, hop numbers and the percentage skimmed along a chain).
+- Evaluation: precision / recall of detections against the simulator's ground-truth labels.
 
-## Notes
-- On Windows, the Flink job runs inside Docker (native PyFlink was unstable).
-- Neo4j login for local development: neo4j / fingraph123.
-- All data is simulated; no real customer data is used.
+    python alerts/test_rules.py -v                # alert rule tests, no database needed
+    python benchmarks/evaluate.py --selftest      # checks the evaluation maths, no database needed
+    python benchmarks/evaluate.py                 # needs Neo4j, run_gds.py and the risk-score queries
+
+### Known limitations and future work
+- Layering chains have no risk rule yet, so recall for layering is lower than for starburst
+  and circular flows. A pass-through rule (money in and out within minutes) is the next step.
+- Dashboard: expand / collapse of groups is not built yet.
+- Planned extensions: adversarial red-team simulator, FastRP embeddings for mule detection,
+  what-if freeze (blast radius) analysis, auto-generated SAR drafts.
 
 ## Alert rules engine
 
@@ -94,3 +106,8 @@ The unit tests use fake Neo4j sessions, so no database is needed:
     python alerts/test_rules.py -v
 
 They cover the threshold boundary, cooldown blocking, re-alerting after cooldown, group alerts with member counts, and per-account cooldowns.
+
+## Notes
+- On Windows, the Flink job runs inside Docker (native PyFlink was unstable).
+- Neo4j login for local development: neo4j / fingraph123.
+- All data is simulated; no real customer data is used.
